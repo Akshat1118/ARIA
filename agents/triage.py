@@ -2,16 +2,18 @@
 ARIA — Triage Agent
 Takes diagnosis + patient info → returns urgency level + reasoning.
 Uses Google Gemini with a clinical triage prompt.
+Includes retry logic for rate limit errors.
 """
 
 import json
+import time
 import google.generativeai as genai
 
 
 def run_triage(model: genai.GenerativeModel, diagnosis: str, confidence: int,
-               age: int, vitals: str, history: str) -> dict:
+               age: int, vitals: str, history: str, max_retries: int = 3) -> dict:
     """
-    Run the Triage Agent.
+    Run the Triage Agent with automatic retry on rate limits.
 
     Returns dict with:
         - triage_level: CRITICAL / HIGH / MODERATE / LOW
@@ -42,19 +44,30 @@ Return your response as a JSON object with these exact keys:
 
 Return ONLY the JSON object, nothing else."""
 
-    response = model.generate_content(prompt)
-    raw = response.text.strip()
+    for attempt in range(max_retries):
+        try:
+            response = model.generate_content(prompt)
+            raw = response.text.strip()
 
-    # Clean up markdown code fences if present
-    if raw.startswith("```"):
-        raw = raw.split("\n", 1)[1]
-        raw = raw.rsplit("```", 1)[0]
-        raw = raw.strip()
+            # Clean up markdown code fences if present
+            if raw.startswith("```"):
+                raw = raw.split("\n", 1)[1]
+                raw = raw.rsplit("```", 1)[0]
+                raw = raw.strip()
 
-    result = json.loads(raw)
+            result = json.loads(raw)
 
-    return {
-        "triage_level": result.get("triage_level", "MODERATE"),
-        "urgency_score": result.get("urgency_score", 5),
-        "reasoning": result.get("reasoning", "")
-    }
+            return {
+                "triage_level": result.get("triage_level", "MODERATE"),
+                "urgency_score": result.get("urgency_score", 5),
+                "reasoning": result.get("reasoning", "")
+            }
+
+        except Exception as e:
+            error_msg = str(e)
+            if "429" in error_msg or "quota" in error_msg.lower() or "rate" in error_msg.lower():
+                wait_time = (attempt + 1) * 15
+                if attempt < max_retries - 1:
+                    time.sleep(wait_time)
+                    continue
+            raise

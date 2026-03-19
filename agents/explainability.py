@@ -2,15 +2,18 @@
 ARIA — Explainability Agent
 Takes all agent outputs → returns one clean, readable summary for the doctor.
 Uses Google Gemini to translate clinical AI outputs into plain English.
+Includes retry logic for rate limit errors.
 """
 
+import time
 import google.generativeai as genai
 
 
 def run_explainability(model: genai.GenerativeModel, diagnosis: str, confidence: int,
-                       triage_level: str, indicators: str, memory_summary: str) -> str:
+                       triage_level: str, indicators: str, memory_summary: str,
+                       max_retries: int = 3) -> str:
     """
-    Run the Explainability Agent.
+    Run the Explainability Agent with automatic retry on rate limits.
 
     Returns a 3-sentence plain English summary that a busy doctor can read in 15 seconds.
     """
@@ -28,5 +31,16 @@ Past History Context: {memory_summary}
 Write in plain English. No jargon. Start with the most critical finding.
 Return ONLY the summary paragraph, nothing else."""
 
-    response = model.generate_content(prompt)
-    return response.text.strip()
+    for attempt in range(max_retries):
+        try:
+            response = model.generate_content(prompt)
+            return response.text.strip()
+
+        except Exception as e:
+            error_msg = str(e)
+            if "429" in error_msg or "quota" in error_msg.lower() or "rate" in error_msg.lower():
+                wait_time = (attempt + 1) * 15
+                if attempt < max_retries - 1:
+                    time.sleep(wait_time)
+                    continue
+            raise
