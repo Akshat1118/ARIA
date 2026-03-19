@@ -15,11 +15,32 @@ st.set_page_config(
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+    /* ══════════════════════════════════════════
+       GLOBAL — Force all text to light colors
+       ══════════════════════════════════════════ */
     .stApp {
         background: linear-gradient(135deg, #0a0e27 0%, #0d1b3e 50%, #0a1628 100%);
         font-family: 'Inter', sans-serif;
+        color: #e6edf3;
     }
-    h1, h2, h3, h4 {
+
+    /* Force ALL text white/light */
+    .stApp, .stApp * { color: #e6edf3; }
+
+    /* ── Sidebar ── */
+    section[data-testid="stSidebar"] {
+        background: linear-gradient(180deg, #0d1b3e 0%, #0a1628 100%);
+        border-right: 1px solid rgba(56, 139, 253, 0.2);
+    }
+    section[data-testid="stSidebar"] * { color: #c9d1d9; }
+    section[data-testid="stSidebar"] h1, section[data-testid="stSidebar"] h2,
+    section[data-testid="stSidebar"] h3, section[data-testid="stSidebar"] h4 {
+        color: #e6edf3 !important;
+    }
+
+    /* ── Headers ── */
+    h1, h2, h3, h4, h5, h6 {
         color: #e6edf3 !important;
         font-family: 'Inter', sans-serif !important;
     }
@@ -29,7 +50,15 @@ st.markdown("""
         -webkit-text-fill-color: transparent;
         font-weight: 700 !important;
     }
-    .stMarkdown, p, span, label, li { color: #c9d1d9; }
+
+    /* ── All text elements ── */
+    .stMarkdown, .stMarkdown p, .stMarkdown span, .stMarkdown li,
+    .stMarkdown td, .stMarkdown th,
+    p, span, label, div, li, td, th, dt, dd, figcaption, strong, em {
+        color: #c9d1d9 !important;
+    }
+
+    /* ── Cards & UI Elements ── */
     .info-card {
         background: rgba(13, 27, 62, 0.6);
         border: 1px solid rgba(56, 139, 253, 0.2);
@@ -59,10 +88,12 @@ st.markdown("""
         transition: all 0.3s ease;
     }
     .agent-card:hover { transform: translateY(-3px); }
-    section[data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #0d1b3e 0%, #0a1628 100%);
-        border-right: 1px solid rgba(56, 139, 253, 0.2);
-    }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #0a0e27; }
+    ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #484f58; }
 </style>
 """, unsafe_allow_html=True)
 

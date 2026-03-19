@@ -33,23 +33,38 @@ st.set_page_config(
 )
 
 # ──────────────────────────────────────────
-# Custom CSS — Dark Navy + Electric Blue Theme (Upgraded)
+# Custom CSS — Dark Navy + Electric Blue Theme (Full Visibility Fix)
 # ──────────────────────────────────────────
 st.markdown("""
 <style>
     @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
+    /* ══════════════════════════════════════════
+       GLOBAL — Force all text to light colors
+       ══════════════════════════════════════════ */
     .stApp {
         background: linear-gradient(135deg, #0a0e27 0%, #0d1b3e 50%, #0a1628 100%);
         font-family: 'Inter', sans-serif;
+        color: #e6edf3;
     }
 
+    /* Force ALL text white/light */
+    .stApp, .stApp * {
+        color: #e6edf3;
+    }
+
+    /* ── Sidebar ── */
     section[data-testid="stSidebar"] {
         background: linear-gradient(180deg, #0d1b3e 0%, #0a1628 100%);
         border-right: 1px solid rgba(56, 139, 253, 0.2);
     }
-    section[data-testid="stSidebar"] .stMarkdown { color: #c9d1d9; }
+    section[data-testid="stSidebar"] * { color: #c9d1d9; }
+    section[data-testid="stSidebar"] h1, section[data-testid="stSidebar"] h2,
+    section[data-testid="stSidebar"] h3, section[data-testid="stSidebar"] h4 {
+        color: #e6edf3 !important;
+    }
 
+    /* ── Headers ── */
     h1, h2, h3, h4, h5, h6 {
         color: #e6edf3 !important;
         font-family: 'Inter', sans-serif !important;
@@ -61,16 +76,40 @@ st.markdown("""
         font-weight: 700 !important;
     }
 
-    .stMarkdown, p, span, label { color: #c9d1d9; }
+    /* ── All text elements ── */
+    .stMarkdown, .stMarkdown p, .stMarkdown span, .stMarkdown li,
+    .stMarkdown td, .stMarkdown th,
+    p, span, label, div, li, td, th, dt, dd, figcaption {
+        color: #c9d1d9 !important;
+    }
 
+    /* ── Captions ── */
+    .stCaption, [data-testid="stCaptionContainer"],
+    [data-testid="stCaptionContainer"] * {
+        color: #8b949e !important;
+    }
+
+    /* ── Form Labels ── */
+    .stTextInput label, .stTextArea label, .stNumberInput label,
+    .stSelectbox label, .stCheckbox label, .stRadio label,
+    .stSlider label, .stDateInput label, .stTimeInput label,
+    .stFileUploader label, .stMultiSelect label,
+    [data-testid="stWidgetLabel"], [data-testid="stWidgetLabel"] * {
+        color: #c9d1d9 !important;
+    }
+
+    /* ── Input Fields ── */
     .stTextInput > div > div > input,
     .stTextArea > div > div > textarea,
-    .stNumberInput > div > div > input,
-    .stSelectbox > div > div > div {
+    .stNumberInput > div > div > input {
         background-color: #161b33 !important;
         color: #e6edf3 !important;
         border: 1px solid rgba(56, 139, 253, 0.3) !important;
         border-radius: 8px !important;
+    }
+    .stTextInput > div > div > input::placeholder,
+    .stTextArea > div > div > textarea::placeholder {
+        color: #484f58 !important;
     }
     .stTextInput > div > div > input:focus,
     .stTextArea > div > div > textarea:focus {
@@ -78,6 +117,41 @@ st.markdown("""
         box-shadow: 0 0 12px rgba(56, 139, 253, 0.3) !important;
     }
 
+    /* ── Selectbox / Dropdown ── */
+    .stSelectbox > div > div > div,
+    .stSelectbox [data-baseweb="select"],
+    .stSelectbox [data-baseweb="select"] * {
+        background-color: #161b33 !important;
+        color: #e6edf3 !important;
+        border-color: rgba(56, 139, 253, 0.3) !important;
+    }
+    /* Dropdown menu items */
+    [data-baseweb="popover"], [data-baseweb="popover"] *,
+    [data-baseweb="menu"], [data-baseweb="menu"] *,
+    [role="listbox"], [role="listbox"] *,
+    [role="option"], [role="option"] * {
+        background-color: #161b33 !important;
+        color: #e6edf3 !important;
+    }
+    [role="option"]:hover {
+        background-color: #1a2744 !important;
+    }
+
+    /* ── Checkbox / Radio ── */
+    .stCheckbox label span, .stRadio label span,
+    .stCheckbox > label, .stRadio > label,
+    [data-testid="stCheckbox"] *, [data-testid="stRadio"] * {
+        color: #c9d1d9 !important;
+    }
+
+    /* ── Number Input Buttons ── */
+    .stNumberInput button {
+        color: #e6edf3 !important;
+        background-color: #1a2744 !important;
+        border-color: rgba(56, 139, 253, 0.3) !important;
+    }
+
+    /* ── Buttons ── */
     .stButton > button {
         background: linear-gradient(135deg, #1a5fb4, #2374d4) !important;
         color: #ffffff !important;
@@ -94,11 +168,75 @@ st.markdown("""
         transform: translateY(-1px) !important;
     }
 
+    /* ── Expander ── */
     div[data-testid="stExpander"] {
         background-color: rgba(13, 27, 62, 0.8) !important;
         border: 1px solid rgba(56, 139, 253, 0.15) !important;
         border-radius: 12px !important;
     }
+    div[data-testid="stExpander"] summary, div[data-testid="stExpander"] summary *,
+    div[data-testid="stExpander"] * {
+        color: #c9d1d9 !important;
+    }
+    div[data-testid="stExpander"] summary svg {
+        fill: #58a6ff !important;
+    }
+
+    /* ── Alert Messages (warning, error, success, info) ── */
+    .stAlert, .stAlert * {
+        color: #e6edf3 !important;
+    }
+    div[data-testid="stNotification"] * {
+        color: #e6edf3 !important;
+    }
+
+    /* ── Progress Bar ── */
+    .stProgress > div > div > div > div {
+        background-color: #58a6ff !important;
+    }
+    .stProgress [data-testid="stMarkdownContainer"] * {
+        color: #c9d1d9 !important;
+    }
+
+    /* ── Dataframe / Table ── */
+    .stDataFrame, .stDataFrame * {
+        color: #e6edf3 !important;
+    }
+    [data-testid="stDataFrame"] {
+        background-color: rgba(13, 27, 62, 0.6) !important;
+    }
+
+    /* ── Tabs ── */
+    .stTabs [data-baseweb="tab-list"] { gap: 4px; }
+    .stTabs [data-baseweb="tab"] {
+        background-color: rgba(13, 27, 62, 0.6) !important;
+        border: 1px solid rgba(56, 139, 253, 0.2) !important;
+        border-radius: 8px 8px 0 0 !important;
+        color: #8b949e !important;
+    }
+    .stTabs [aria-selected="true"] {
+        background-color: rgba(56, 139, 253, 0.15) !important;
+        color: #58a6ff !important;
+        border-bottom: 2px solid #58a6ff !important;
+    }
+
+    /* ── Metric Cards ── */
+    div[data-testid="stMetric"] {
+        background: rgba(13, 27, 62, 0.6);
+        border: 1px solid rgba(56, 139, 253, 0.2);
+        border-radius: 12px; padding: 1rem;
+    }
+    div[data-testid="stMetric"] label { color: #8b949e !important; }
+    div[data-testid="stMetric"] [data-testid="stMetricValue"] { color: #58a6ff !important; }
+
+    /* ── Audio Input ── */
+    [data-testid="stAudioInput"] *, .stAudioInput * {
+        color: #c9d1d9 !important;
+    }
+
+    /* ══════════════════════════════════════════
+       CUSTOM COMPONENT STYLES
+       ══════════════════════════════════════════ */
 
     /* ── Card Styles ── */
     .aria-card {
@@ -130,12 +268,12 @@ st.markdown("""
         0%, 100% { opacity: 1; }
         50% { opacity: 0.85; }
     }
-    .triage-critical { background: linear-gradient(135deg, #da3633, #f85149); color: white; }
-    .triage-high { background: linear-gradient(135deg, #9e6a03, #d29922); color: white; }
-    .triage-moderate { background: linear-gradient(135deg, #1a5fb4, #58a6ff); color: white; }
-    .triage-low { background: linear-gradient(135deg, #238636, #3fb950); color: white; }
+    .triage-critical { background: linear-gradient(135deg, #da3633, #f85149); color: white !important; }
+    .triage-high { background: linear-gradient(135deg, #9e6a03, #d29922); color: white !important; }
+    .triage-moderate { background: linear-gradient(135deg, #1a5fb4, #58a6ff); color: white !important; }
+    .triage-low { background: linear-gradient(135deg, #238636, #3fb950); color: white !important; }
 
-    /* ── Agent Status with Animation ── */
+    /* ── Agent Status ── */
     .agent-status {
         padding: 0.6rem 1rem; margin: 0.3rem 0; border-radius: 8px;
         font-family: 'Inter', monospace; font-size: 0.9rem;
@@ -143,18 +281,18 @@ st.markdown("""
     }
     .agent-running {
         background: rgba(56, 139, 253, 0.1); border-left: 3px solid #58a6ff;
-        color: #58a6ff; animation: agent-glow 1.5s ease-in-out infinite;
+        color: #58a6ff !important; animation: agent-glow 1.5s ease-in-out infinite;
     }
     @keyframes agent-glow {
         0%, 100% { box-shadow: 0 0 5px rgba(56, 139, 253, 0.2); }
         50% { box-shadow: 0 0 15px rgba(56, 139, 253, 0.4); }
     }
     .agent-done {
-        background: rgba(63, 185, 80, 0.1); border-left: 3px solid #3fb950; color: #3fb950;
+        background: rgba(63, 185, 80, 0.1); border-left: 3px solid #3fb950; color: #3fb950 !important;
     }
 
-    .bias-pass { color: #3fb950; }
-    .bias-flag { color: #f85149; }
+    .bias-pass { color: #3fb950 !important; }
+    .bias-flag { color: #f85149 !important; }
 
     .sdg-bar {
         background: linear-gradient(135deg, rgba(13, 27, 62, 0.8), rgba(35, 116, 212, 0.2));
@@ -179,11 +317,8 @@ st.markdown("""
     .confidence-ring {
         width: 120px; height: 120px; border-radius: 50%; margin: 0 auto;
         display: flex; align-items: center; justify-content: center;
-        font-size: 1.8rem; font-weight: 700; color: #e6edf3;
+        font-size: 1.8rem; font-weight: 700; color: #e6edf3 !important;
         position: relative;
-    }
-    .confidence-ring::after {
-        content: '%'; font-size: 0.9rem; font-weight: 400; color: #8b949e;
     }
 
     /* ── Critical Alert ── */
@@ -204,6 +339,15 @@ st.markdown("""
         color: white !important; border: none !important;
         border-radius: 8px !important;
     }
+
+    /* ── Code blocks ── */
+    code, pre, .stCodeBlock { color: #e6edf3 !important; }
+
+    /* ── Scrollbar ── */
+    ::-webkit-scrollbar { width: 8px; }
+    ::-webkit-scrollbar-track { background: #0a0e27; }
+    ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 4px; }
+    ::-webkit-scrollbar-thumb:hover { background: #484f58; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -419,6 +563,17 @@ if run_button:
         st.error("⚠️ Please enter patient symptoms before running the pipeline.")
         st.stop()
 
+    # ── Edge case warnings (non-blocking) ──
+    missing_fields = []
+    if not vitals.strip():
+        missing_fields.append("Vitals")
+    if not labs.strip():
+        missing_fields.append("Lab Results")
+    if not history.strip():
+        missing_fields.append("Medical History")
+    if missing_fields:
+        st.warning(f"⚠️ Missing: **{', '.join(missing_fields)}** — ARIA will still run but results may be less accurate.")
+
     api_key = os.getenv("GEMINI_API_KEY", "")
     if not api_key or api_key == "PASTE-YOUR-GEMINI-KEY-HERE":
         st.error("⚠️ Please add your Gemini API key in the `.env` file. Get it free at https://aistudio.google.com/apikey")
@@ -433,9 +588,9 @@ if run_button:
         "age": age,
         "gender": gender,
         "symptoms": symptoms,
-        "vitals": vitals,
-        "labs": labs,
-        "history": history,
+        "vitals": vitals or "Not provided",
+        "labs": labs or "Not provided",
+        "history": history or "Not provided",
         "income_bracket": income
     }
 
