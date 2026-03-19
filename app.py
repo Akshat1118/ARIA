@@ -513,7 +513,7 @@ if "results" in st.session_state:
 
     st.markdown("---")
 
-    # ── CRITICAL Alert Banner ──
+    # ── CRITICAL Alert Banner + Sound ──
     triage_level = results["triage"]["triage_level"]
     if triage_level == "CRITICAL":
         st.markdown(f"""
@@ -522,6 +522,37 @@ if "results" in st.session_state:
                 <strong style="color: #f85149; font-size: 1.2rem;"> CRITICAL ALERT — Immediate attention required</strong>
                 <span style="font-size: 1.5rem;">🚨</span>
                 <p style="color: #f85149; margin: 0.3rem 0 0 0;">{results['triage']['reasoning']}</p>
+            </div>
+            <script>
+                // Play 3-beep alert sound using Web Audio API
+                (function() {{
+                    try {{
+                        const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                        function beep(freq, startTime, duration) {{
+                            const osc = ctx.createOscillator();
+                            const gain = ctx.createGain();
+                            osc.connect(gain);
+                            gain.connect(ctx.destination);
+                            osc.frequency.value = freq;
+                            osc.type = 'sine';
+                            gain.gain.setValueAtTime(0.3, startTime);
+                            gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration);
+                            osc.start(startTime);
+                            osc.stop(startTime + duration);
+                        }}
+                        const now = ctx.currentTime;
+                        beep(880, now, 0.2);
+                        beep(880, now + 0.3, 0.2);
+                        beep(1100, now + 0.6, 0.4);
+                    }} catch(e) {{}}
+                }})();
+            </script>
+        """, unsafe_allow_html=True)
+    elif triage_level == "HIGH":
+        st.markdown(f"""
+            <div style="background: rgba(210, 153, 34, 0.1); border: 2px solid #d29922; border-radius: 12px; padding: 1rem; margin: 0.5rem 0; text-align: center;">
+                <strong style="color: #d29922; font-size: 1.1rem;">⚠️ HIGH PRIORITY — Attend within 30 minutes</strong>
+                <p style="color: #d29922; margin: 0.3rem 0 0 0; font-size: 0.9rem;">{results['triage']['reasoning']}</p>
             </div>
         """, unsafe_allow_html=True)
 
