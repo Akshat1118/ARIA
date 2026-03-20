@@ -21,10 +21,6 @@ from agents.memory import get_patient_timeline
 from utils.voice import transcribe_audio
 from utils.sdg_tracker import get_stats
 
-# ──────────────────────────────────────────
-# Load environment
-# ──────────────────────────────────────────
-load_dotenv()
 
 # ──────────────────────────────────────────
 # Page Config
