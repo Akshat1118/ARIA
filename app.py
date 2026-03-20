@@ -9,7 +9,11 @@ import pandas as pd
 import os
 import time
 from datetime import datetime
-from dotenv import load_dotenv
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass  # In production (Streamlit Cloud), env vars are set in the UI, so dotenv isn't needed.
 import google.generativeai as genai
 
 from agents.pipeline import run_pipeline
