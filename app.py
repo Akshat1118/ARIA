@@ -7,16 +7,24 @@ Features: Model selector, confidence gauge, export report, better animations
 import streamlit as st
 import pandas as pd
 import os
+import json
 import time
 from datetime import datetime
+from report_gen import generate_pdf_report
+
 try:
     from dotenv import load_dotenv
-    load_dotenv()
+    load_dotenv(override=True)
 except ImportError:
     pass  # In production (Streamlit Cloud), env vars are set in the UI, so dotenv isn't needed.
 import google.generativeai as genai
 
-from agents.pipeline import run_pipeline
+# Explicitly configure using the env variable so we immediately catch any `.env` file updates
+api_key = os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+if api_key:
+    genai.configure(api_key=api_key)
+
+from agents.graph import run_pipeline
 from agents.memory import get_patient_timeline
 from utils.voice import transcribe_audio
 from utils.sdg_tracker import get_stats
@@ -381,60 +389,76 @@ def get_confidence_color(confidence):
 
 
 def generate_report(patient_data, results):
-    """Generate a downloadable text report of the ARIA analysis."""
-    report = f"""
-{'='*60}
-  ARIA — Clinical Decision Support Report
-  Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-{'='*60}
+    """Generate a downloadable markdown report of the ARIA Multi-Agent analysis."""
+    
+    # Extract new uncertainty fields if available
+    epistemic_unc = results['diagnosis'].get('epistemic_uncertainty', 'N/A')
+    data_qual = results['diagnosis'].get('data_quality_score', 'N/A')
+    
+    # Extract conflict reporting if available
+    conflict_detected = results.get('conflict', False)
+    conflict_text = f"⚔️ **CONFLICT DETECTED & RESOLVED**\n{chr(10).join(results['triage'].get('conflict_audit', ['Triage adjusted by Conflict Resolver Agent.']))}" if conflict_detected else "✅ No conflicts between Diagnostic & Triage agents."
+    
+    # Extract cascade bias reporting
+    cascade_flag = results['bias_report'].get('cascading_amplification', False)
+    cascade_text = "⚠️ **CASCADING BIAS FLAG: Bias amplified across the pipeline!**" if cascade_flag else "✅ No cascading amplification detected."
+    
+    report = f"""# ARIA — Clinical Decision Support Report
+*Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}*
 
-PATIENT INFORMATION
-{'─'*40}
-  Name:           {patient_data.get('name', 'N/A')}
-  Patient ID:     {patient_data.get('patient_id', 'N/A')}
-  Age:            {patient_data.get('age', 'N/A')}
-  Gender:         {patient_data.get('gender', 'N/A')}
-  Symptoms:       {patient_data.get('symptoms', 'N/A')}
-  Vitals:         {patient_data.get('vitals', 'N/A')}
-  Lab Results:    {patient_data.get('labs', 'N/A')}
-  Medical History:{patient_data.get('history', 'N/A')}
+## 🧑‍⚕️ PATIENT INFORMATION
+* **Name:** {patient_data.get('name', 'N/A')}
+* **Patient ID:** {patient_data.get('patient_id', 'N/A')}
+* **Age:** {patient_data.get('age', 'N/A')}
+* **Gender:** {patient_data.get('gender', 'N/A')}
+* **Symptoms:** {patient_data.get('symptoms', 'N/A')}
+* **Vitals:** {patient_data.get('vitals', 'N/A')}
+* **Lab Results:** {patient_data.get('labs', 'N/A')}
+* **Medical History:** {patient_data.get('history', 'N/A')}
 
-DIAGNOSIS
-{'─'*40}
-  Primary:        {results['diagnosis']['diagnosis']}
-  Confidence:     {results['diagnosis']['confidence']}%
-  Alternatives:   {', '.join(results['diagnosis']['alternatives'])}
-  Key Indicators: {results['diagnosis']['indicators']}
+---
 
-TRIAGE ASSESSMENT
-{'─'*40}
-  Level:          {results['triage']['triage_level']}
-  Urgency Score:  {results['triage']['urgency_score']}/10
-  Reasoning:      {results['triage']['reasoning']}
+## 🔬 DIAGNOSIS (Multi-Agent Run)
+* **Primary:** {results['diagnosis']['diagnosis']}
+* **Mean Confidence:** {results['diagnosis']['confidence']}%
+* **Epistemic Uncertainty:** {epistemic_unc} *(Lower is better)*
+* **Data Quality Score:** {data_qual}/100
+* **Alternatives:** {', '.join(results['diagnosis']['alternatives'])}
+* **Key Indicators:** {results['diagnosis']['indicators']}
 
-DOCTOR SUMMARY
-{'─'*40}
-  {results['doctor_summary']}
+---
 
-FAIRNESS AUDIT
-{'─'*40}
-  Gender Bias:    {results['bias_report']['gender_bias']['status']}
-                  {results['bias_report']['gender_bias']['detail']}
-  Age Bias:       {results['bias_report']['age_bias']['status']}
-                  {results['bias_report']['age_bias']['detail']}
-  Income Bias:    {results['bias_report']['income_bias']['status']}
-                  {results['bias_report']['income_bias']['detail']}
+## 🚨 TRIAGE & CONFLICT RESOLUTION
+* **Triage Level:** {results['triage']['triage_level']}
+* **Urgency Score:** {results['triage']['urgency_score']}/10
+* **Reasoning:** {results['triage']['reasoning']}
 
-PATIENT HISTORY
-{'─'*40}
-  {results['memory_summary']}
+{conflict_text}
 
-{'='*60}
-  DISCLAIMER: This is an AI-assisted analysis for clinical
-  decision support only. Not a substitute for clinical judgment.
-{'='*60}
+---
+
+## 💡 DOCTOR SUMMARY (Explainability Agent)
+{results['doctor_summary']}
+
+---
+
+## ⚖️ FAIRNESS & CASCADING BIAS AUDIT
+* **Gender Bias:** {results['bias_report']['gender_bias']['status']} ({results['bias_report']['gender_bias']['detail']})
+* **Age Bias:** {results['bias_report']['age_bias']['status']} ({results['bias_report']['age_bias']['detail']})
+* **Income Bias:** {results['bias_report']['income_bias']['status']} ({results['bias_report']['income_bias']['detail']})
+
+{cascade_text}
+
+---
+
+## 🧠 TEMPORAL MEMORY (Vector Semantic Search)
+```text
+{results['memory_summary']}
+```
 """
     return report
+
+
 
 
 # ──────────────────────────────────────────
@@ -593,6 +617,15 @@ if run_button:
         "history": history or "Not provided",
         "income_bracket": income
     }
+    
+    # Simple hash to avoid re-running unchanged inputs (saves API quota)
+    import hashlib
+    data_str = json.dumps(patient_data, sort_keys=True)
+    current_hash = hashlib.md5(data_str.encode()).hexdigest()
+    
+    if "last_run_hash" in st.session_state and st.session_state["last_run_hash"] == current_hash and "results" in st.session_state:
+        st.success("✅ Output loaded from cache (No API quota used). Change patient details to re-run.")
+        st.stop()
 
     # ── Live Agent Thinking Screen ──
     st.markdown("### 🧠 Agent Pipeline")
@@ -605,6 +638,7 @@ if run_button:
         "Temporal Memory Agent": "🧠",
         "Diagnostic Agent": "🔬",
         "Triage Agent": "🚨",
+        "Conflict Resolver": "⚔️",
         "Bias Monitor": "⚖️",
         "Explainability Agent": "💡"
     }
@@ -612,6 +646,7 @@ if run_button:
         "Temporal Memory Agent": "scanning patient history...",
         "Diagnostic Agent": "analyzing symptoms & generating diagnosis...",
         "Triage Agent": "scoring clinical urgency...",
+        "Conflict Resolver": "resolving clinical mismatch...",
         "Bias Monitor": "auditing for demographic bias...",
         "Explainability Agent": "writing doctor-friendly summary..."
     }
@@ -620,7 +655,16 @@ if run_button:
         progress_placeholder = st.empty()
         progress_bar = st.progress(0, text="Initializing agents...")
 
+    from streamlit.runtime.scriptrunner import get_script_run_ctx, add_script_run_ctx
+    import threading
+    
+    ctx = get_script_run_ctx()
+
     def update_agent_status(agent_name, status):
+        # LangGraph runs nodes in a ThreadPoolExecutor. Streamlit UI calls require context.
+        if get_script_run_ctx() is None and ctx is not None:
+            add_script_run_ctx(threading.current_thread(), ctx)
+            
         agent_statuses[agent_name] = status
         # Update progress bar
         done_count = sum(1 for v in agent_statuses.values() if v == "done")
@@ -647,8 +691,10 @@ if run_button:
         progress_bar.progress(1.0, text="✅ All agents complete!")
         st.session_state["results"] = results
         st.session_state["patient_data"] = patient_data
+        st.session_state["last_run_hash"] = current_hash
     except Exception as e:
-        error_msg = str(e)
+        import traceback
+        error_msg = traceback.format_exc()
         if "429" in error_msg or "quota" in error_msg.lower():
             st.error(f"⚠️ **Rate limit hit** even after retries. Your Gemini free tier daily quota is exhausted.\n\n"
                      f"**Options:**\n"
@@ -656,7 +702,7 @@ if run_button:
                      f"- Try a different model from the dropdown\n"
                      f"- Use a new API key from a different Google account")
         else:
-            st.error(f"❌ Pipeline error: {error_msg}")
+            st.error(f"❌ Pipeline error: {repr(e)}\n\nTraceback:\n{error_msg}")
         st.stop()
 
 # ──────────────────────────────────────────
@@ -726,8 +772,12 @@ if "results" in st.session_state:
                 <p style="font-size: 1.3rem; color: #e6edf3; font-weight: 600; margin: 0;">
                     {diag['diagnosis']}
                 </p>
+                <p style="color: #58a6ff; font-size: 0.85rem; margin: 0.5rem 0 0.3rem 0;">
+                    <strong>Epistemic Uncertainty:</strong> {diag.get('epistemic_uncertainty', 'N/A')} | 
+                    <strong>Data Quality:</strong> {diag.get('data_quality_score', 'N/A')}/100
+                </p>
                 <p style="color: #8b949e; font-size: 0.85rem; margin: 0.5rem 0 0.3rem 0;">
-                    <strong>Key Indicators:</strong> {diag['indicators']}
+                    <strong>Key Indicators:</strong> {diag.get('indicators', '')}
                 </p>
                 <p style="color: #8b949e; font-size: 0.85rem; margin: 0;">
                     <strong>Alternatives:</strong> {', '.join(diag['alternatives'])}
@@ -845,14 +895,26 @@ if "results" in st.session_state:
             st.markdown(f"```\n{results['memory_summary']}\n```")
 
     with export_col:
-        report_text = generate_report(patient_data, results)
-        st.download_button(
-            label="📄 Download Report",
-            data=report_text,
-            file_name=f"ARIA_Report_{patient_data.get('patient_id', 'unknown')}_{datetime.now().strftime('%Y%m%d_%H%M')}.txt",
-            mime="text/plain",
-            use_container_width=True
-        )
+        try:
+            pdf_bytes = generate_pdf_report(patient_data, results)
+            st.download_button(
+                label="📄 Download PDF Report",
+                data=pdf_bytes,
+                file_name=f"ARIA_Report_{patient_data.get('patient_id', 'unknown')}_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                mime="application/pdf",
+                use_container_width=True
+            )
+        except Exception as e:
+            st.error(f"PDF Generation Error: {str(e)}")
+            # Fallback to markdown report
+            report_text = generate_report(patient_data, results)
+            st.download_button(
+                label="📄 Download Report (Markdown)",
+                data=report_text,
+                file_name=f"ARIA_Report_{patient_data.get('patient_id', 'unknown')}_{datetime.now().strftime('%Y%m%d_%H%M')}.md",
+                mime="text/markdown",
+                use_container_width=True
+            )
 
     # ── New Patient Button ──
     st.markdown("")
