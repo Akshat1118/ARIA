@@ -1,6 +1,7 @@
 """
-ARIA — LangGraph Orchestrator (Phase 1)
-Replaces pipeline.py with a stateful, branching graph architecture.
+ARIA — LangGraph Orchestrator (Phase 2 — Dual Model Architecture)
+DeepSeek-R1 (local via Ollama) handles diagnosis.
+Gemini handles triage, explainability, and conflict resolution.
 """
 
 from typing import Dict, Any, Optional
@@ -9,7 +10,7 @@ from langgraph.graph import StateGraph, START, END
 import google.generativeai as genai
 
 from agents.memory import get_patient_history, store_visit
-from agents.diagnostic import run_diagnosis
+from agents.diagnostic import run_diagnosis, check_ollama_status
 from agents.uncertainty import compute_uncertainty
 from agents.triage import run_triage
 from agents.conflict_resolver import detect_conflict, resolve_conflict
@@ -38,6 +39,7 @@ class AgentState(TypedDict):
     # Internal metrics
     reanalyzed: bool
     conflict_detected: bool
+    model_used: Optional[str]
 
 
 # 2. Define the Nodes
@@ -58,16 +60,16 @@ def fetch_memory_node(state: AgentState):
 
 
 def initial_diagnostic_node(state: AgentState):
-    """Node 2: Runs the initial diagnostic assessment without memory."""
+    """Node 2: Runs the initial diagnostic assessment using local DeepSeek-R1."""
     status_callback = state.get("status_callback")
     if status_callback:
-        status_callback("Diagnostic Agent", "analyzing (initial)")
+        status_callback("Diagnostic Agent", "analyzing via DeepSeek-R1 (local)")
         
     patient_data = state["patient_data"]
     
-    # Initial run only uses current medical history
+    # Diagnosis runs on LOCAL DeepSeek-R1 model via Ollama — zero API calls
     diagnosis_result = compute_uncertainty(
-        model=state["model"],
+        model=None,  # Not needed — uses local DeepSeek-R1
         symptoms=patient_data.get("symptoms", ""),
         vitals=patient_data.get("vitals", ""),
         labs=patient_data.get("labs", ""),
@@ -76,17 +78,19 @@ def initial_diagnostic_node(state: AgentState):
         gender=patient_data.get("gender", "")
     )
     
+    model_used = diagnosis_result.get("model_used", "DeepSeek-R1:8b (Local)")
+    
     if status_callback:
         status_callback("Diagnostic Agent", "done")
         
-    return {"diagnosis_result": diagnosis_result, "reanalyzed": False}
+    return {"diagnosis_result": diagnosis_result, "reanalyzed": False, "model_used": model_used}
 
 
 def reanalyze_diagnostic_node(state: AgentState):
     """Node 3 (Conditional): Re-runs diagnosis IF confidence was < 60%, incorporating temporal memory."""
     status_callback = state.get("status_callback")
     if status_callback:
-        status_callback("Diagnostic Agent", "re-analyzing (low confidence)")
+        status_callback("Diagnostic Agent", "re-analyzing via DeepSeek-R1 (low confidence)")
         
     patient_data = state["patient_data"]
     memory_summary = state.get("memory_summary", "No previous visits found for this patient.")
@@ -96,8 +100,9 @@ def reanalyze_diagnostic_node(state: AgentState):
     if memory_summary != "No previous visits found for this patient.":
         combined_history += f"\n\nPrevious Visits:\n{memory_summary}"
         
+    # Re-run on LOCAL DeepSeek-R1 with enriched history
     diagnosis_result = compute_uncertainty(
-        model=state["model"],
+        model=None,  # Not needed — uses local DeepSeek-R1
         symptoms=patient_data.get("symptoms", ""),
         vitals=patient_data.get("vitals", ""),
         labs=patient_data.get("labs", ""),
@@ -106,10 +111,12 @@ def reanalyze_diagnostic_node(state: AgentState):
         gender=patient_data.get("gender", "")
     )
     
+    model_used = diagnosis_result.get("model_used", "DeepSeek-R1:8b (Local)")
+    
     if status_callback:
         status_callback("Diagnostic Agent", "done")
         
-    return {"diagnosis_result": diagnosis_result, "reanalyzed": True}
+    return {"diagnosis_result": diagnosis_result, "reanalyzed": True, "model_used": model_used}
 
 
 def triage_node(state: AgentState):
@@ -311,7 +318,8 @@ def run_pipeline(model: genai.GenerativeModel, patient_data: dict, status_callba
         "bias_result": None,
         "doctor_summary": None,
         "reanalyzed": False,
-        "conflict_detected": False
+        "conflict_detected": False,
+        "model_used": None
     }
     
     # Run the graph (using synchronous invoke, but it resolves the DAG)
@@ -324,6 +332,7 @@ def run_pipeline(model: genai.GenerativeModel, patient_data: dict, status_callba
         "triage": final_state.get("triage_result", {}),
         "bias_report": final_state.get("bias_result", {}),
         "doctor_summary": final_state.get("doctor_summary", ""),
-        "reanalyzed": final_state.get("reanalyzed", False),  # Added to track fallback
-        "conflict": final_state.get("conflict_detected", False)
+        "reanalyzed": final_state.get("reanalyzed", False),
+        "conflict": final_state.get("conflict_detected", False),
+        "model_used": final_state.get("model_used", "DeepSeek-R1:8b (Local)")
     }

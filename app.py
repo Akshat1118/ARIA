@@ -469,16 +469,20 @@ with st.sidebar:
     st.markdown("*Autonomous Real-time Intelligence for Clinical Action*")
     st.markdown("---")
 
-    # ── Model Selector ──
     st.markdown("### ⚙️ Settings")
-    model_options = {
-        "Gemini 2.5 Flash (Recommended)": "gemini-2.5-flash",
-        "Gemini 2.0 Flash": "gemini-2.0-flash",
-        "Gemini 2.0 Flash Lite": "gemini-2.0-flash-lite",
-        "Gemini 2.5 Pro (Slower, Smarter)": "gemini-2.5-pro",
+    # Model Selection mappings
+    model_configs = {
+        "Hybrid (Local DeepSeek-R1 + Gemini Flash)": "gemini-2.5-flash",
+        "Hybrid (Local DeepSeek-R1 + Gemini Pro)": "gemini-2.5-pro",
+        "Hybrid (Local DeepSeek-R1 + Gemini 2.0)": "gemini-2.0-flash-exp"
     }
-    selected_model_name = st.selectbox("🤖 AI Model", list(model_options.keys()))
-    selected_model = model_options[selected_model_name]
+    
+    selected_model_name = st.selectbox(
+        label="🤖 Architecture Mode",
+        options=list(model_configs.keys()),
+        index=0
+    )
+    selected_model = model_configs[selected_model_name]
     st.caption(f"Using: `{selected_model}`")
 
     st.markdown("---")
@@ -644,7 +648,7 @@ if run_button:
     }
     agent_actions = {
         "Temporal Memory Agent": "scanning patient history...",
-        "Diagnostic Agent": "analyzing symptoms & generating diagnosis...",
+        "Diagnostic Agent": "analyzing via local DeepSeek-R1 (takes 1-2 mins)...",
         "Triage Agent": "scoring clinical urgency...",
         "Conflict Resolver": "resolving clinical mismatch...",
         "Bias Monitor": "auditing for demographic bias...",
@@ -766,11 +770,15 @@ if "results" in st.session_state:
     with res_col1:
         diag = results["diagnosis"]
         card_class = get_card_class(triage_level)
+        model_used = st.session_state.get('pipeline_results', {}).get('model_used', 'DeepSeek-R1:8b (Local via Ollama)')
         st.markdown(f"""
             <div class="{card_class}">
                 <h4 style="margin: 0 0 0.5rem 0;">🔬 Diagnosis</h4>
                 <p style="font-size: 1.3rem; color: #e6edf3; font-weight: 600; margin: 0;">
                     {diag['diagnosis']}
+                </p>
+                <p style="color: #8b949e; font-size: 0.85rem; margin: 0.5rem 0 0.3rem 0;">
+                    <strong>🤖 Model Used:</strong> `{model_used}`
                 </p>
                 <p style="color: #58a6ff; font-size: 0.85rem; margin: 0.5rem 0 0.3rem 0;">
                     <strong>Epistemic Uncertainty:</strong> {diag.get('epistemic_uncertainty', 'N/A')} | 
@@ -784,6 +792,11 @@ if "results" in st.session_state:
                 </p>
             </div>
         """, unsafe_allow_html=True)
+        
+        # PROOF FOR HACKATHON
+        if "local_reasoning" in diag:
+            with st.expander("👀 View Local Model's Reasoning (DeepSeek-R1 <think> block)"):
+                st.code(diag["local_reasoning"], language="text")
 
     with res_col2:
         conf = diag['confidence']

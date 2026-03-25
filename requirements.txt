@@ -6,3 +6,4 @@ fpdf
 langgraph
 chromadb
 matplotlib
+requests
