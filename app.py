@@ -11,6 +11,7 @@ import json
 import time
 from datetime import datetime
 from report_gen import generate_pdf_report
+from sarvam_translate import translate_patient_report, SUPPORTED_LANGUAGES
 
 try:
     from dotenv import load_dotenv
@@ -589,6 +590,15 @@ with st.sidebar:
     st.markdown("---")
     run_button = st.button("🚀 Run ARIA Pipeline", use_container_width=True, type="primary")
 
+    st.markdown("---")
+    st.markdown("### 🌐 Multilingual Report")
+    report_lang = st.selectbox(
+        "Patient Summary Language",
+        ["English"] + list(SUPPORTED_LANGUAGES.keys()),
+        index=0,
+        help="Translate the patient-facing summary using Sarvam AI"
+    )
+
 
 # ──────────────────────────────────────────
 # Main Area — Header
@@ -1076,20 +1086,42 @@ if "results" in st.session_state:
 
     with export_col:
         try:
-            pdf_bytes = generate_pdf_report(patient_data, results)
+            translated_content = None
+            target_language = None
+
+            if report_lang != "English":
+                with st.spinner(f"Translating to {report_lang} via Sarvam AI..."):
+                    lang_code = SUPPORTED_LANGUAGES[report_lang]
+                    translated_content = translate_patient_report(
+                        patient_data, results, target_language=lang_code
+                    )
+                    target_language = report_lang
+
+            pdf_bytes = generate_pdf_report(
+                patient_data, results,
+                translated_content=translated_content,
+                target_language=target_language
+            )
+
+            lang_tag = f"_{report_lang}" if report_lang != "English" else ""
+            dl_label = "Download PDF Report"
+            if report_lang != "English":
+                dl_label += f" ({report_lang})"
+
             st.download_button(
-                label="📄 Download PDF Report",
+                label=dl_label,
                 data=pdf_bytes,
-                file_name=f"ARIA_Report_{patient_data.get('patient_id', 'unknown')}_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                file_name=f"ARIA_Report_{patient_data.get('patient_id', 'unknown')}_{datetime.now().strftime('%Y%m%d_%H%M')}{lang_tag}.pdf",
                 mime="application/pdf",
                 use_container_width=True
             )
+            if report_lang != "English":
+                st.success(f"Includes {report_lang} patient summary (Sarvam AI)")
         except Exception as e:
             st.error(f"PDF Generation Error: {str(e)}")
-            # Fallback to markdown report
             report_text = generate_report(patient_data, results)
             st.download_button(
-                label="📄 Download Report (Markdown)",
+                label="Download Report (Markdown)",
                 data=report_text,
                 file_name=f"ARIA_Report_{patient_data.get('patient_id', 'unknown')}_{datetime.now().strftime('%Y%m%d_%H%M')}.md",
                 mime="text/markdown",
