@@ -8,7 +8,6 @@ import os
 import requests
 
 SARVAM_API_URL = "https://api.sarvam.ai/translate"
-SARVAM_API_KEY = os.getenv("SARVAM_API_KEY", "")
 
 SUPPORTED_LANGUAGES = {
     "Hindi": "hi-IN",
@@ -35,14 +34,16 @@ def translate_text(text, target_language="hi-IN", source_language="en-IN"):
     Returns:
         Translated text string, or original text if translation fails.
     """
-    if not SARVAM_API_KEY:
+    api_key = os.getenv("SARVAM_API_KEY", "")
+    if not api_key:
+        print("SARVAM API KEY MISSING")
         return text  # Graceful fallback
     
     if not text or len(text.strip()) < 2:
         return text
 
     headers = {
-        "api-subscription-key": SARVAM_API_KEY,
+        "api-subscription-key": api_key,
         "Content-Type": "application/json"
     }
 
