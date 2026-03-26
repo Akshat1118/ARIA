@@ -163,4 +163,117 @@ def generate_pdf_report(patient_data, results):
     pdf.set_text_color(80, 80, 80)
     pdf.multi_cell(W, 4, safetext(results.get('memory_summary', 'No history.')))
 
+    # 5. Treatment Plan
+    pdf.add_page()
+    pdf.set_font("helvetica", "B", 14)
+    pdf.set_text_color(0, 51, 102)
+    pdf.cell(W, 10, "5. Treatment Plan", ln=True)
+    pdf.ln(2)
+
+    treat = results.get('treatment_plan', {})
+    pdf.set_font("helvetica", "B", 10)
+    pdf.set_text_color(40, 40, 40)
+    pdf.cell(W, 7, "Immediate Actions:", ln=True)
+    pdf.set_font("helvetica", size=10)
+    for action in treat.get('immediate_actions', ['N/A']):
+        pdf.multi_cell(W, 6, safetext(f"  - {action}"))
+
+    if treat.get('medications'):
+        pdf.ln(2)
+        pdf.set_font("helvetica", "B", 10)
+        pdf.cell(W, 7, "Medications:", ln=True)
+        pdf.set_font("helvetica", size=10)
+        for med in treat['medications']:
+            if isinstance(med, dict):
+                med_str = f"  - {med.get('name', 'N/A')} | {med.get('dosage', '')} | {med.get('route', '')} | {med.get('frequency', '')}"
+            else:
+                med_str = f"  - {med}"
+            pdf.multi_cell(W, 6, safetext(med_str))
+
+    if treat.get('monitoring'):
+        pdf.ln(2)
+        pdf.set_font("helvetica", "B", 10)
+        pdf.cell(30, 7, "Monitoring:", ln=False)
+        pdf.set_font("helvetica", size=10)
+        pdf.multi_cell(W-30, 6, safetext(treat['monitoring']))
+
+    if treat.get('precautions'):
+        pdf.set_font("helvetica", "B", 10)
+        pdf.cell(30, 7, "Precautions:", ln=False)
+        pdf.set_font("helvetica", size=10)
+        pdf.multi_cell(W-30, 6, safetext(treat['precautions']))
+
+    # 6. Specialist Referral
+    pdf.ln(8)
+    pdf.set_font("helvetica", "B", 14)
+    pdf.set_text_color(0, 51, 102)
+    pdf.cell(W, 10, "6. Specialist Referral", ln=True)
+    pdf.ln(2)
+
+    ref = results.get('referral', {})
+    pdf.set_font("helvetica", size=10)
+    pdf.set_text_color(40, 40, 40)
+    ref_needed = "Yes" if ref.get('referral_needed') else "No"
+    pdf.multi_cell(W, 6, safetext(f"Referral Needed: {ref_needed}"))
+    if ref.get('departments'):
+        pdf.multi_cell(W, 6, safetext(f"Departments: {', '.join(ref['departments'])}"))
+    pdf.multi_cell(W, 6, safetext(f"Urgency: {ref.get('urgency', 'N/A')}"))
+    pdf.multi_cell(W, 6, safetext(f"Reasoning: {ref.get('reasoning', 'N/A')}"))
+
+    # 7. Patient-Friendly Summary
+    pdf.ln(8)
+    pdf.set_font("helvetica", "B", 14)
+    pdf.set_text_color(0, 51, 102)
+    pdf.cell(W, 10, "7. Patient-Friendly Summary", ln=True)
+    pdf.ln(2)
+    pdf.set_font("helvetica", "I", 10)
+    pdf.set_text_color(40, 40, 40)
+    pdf.multi_cell(W, 6, safetext(results.get('patient_message', 'N/A')))
+
+    # 8. Follow-Up Care Plan
+    pdf.ln(8)
+    pdf.set_font("helvetica", "B", 14)
+    pdf.set_text_color(0, 51, 102)
+    pdf.cell(W, 10, "8. Follow-Up Care Plan", ln=True)
+    pdf.ln(2)
+
+    fu = results.get('follow_up', {})
+    pdf.set_font("helvetica", size=10)
+    pdf.set_text_color(40, 40, 40)
+
+    if fu.get('discharge_instructions'):
+        pdf.set_font("helvetica", "B", 10)
+        pdf.cell(W, 7, "Discharge Instructions:", ln=True)
+        pdf.set_font("helvetica", size=10)
+        pdf.multi_cell(W, 6, safetext(fu['discharge_instructions']))
+
+    if fu.get('follow_up_timeline'):
+        pdf.ln(2)
+        pdf.set_font("helvetica", "B", 10)
+        pdf.cell(W, 7, "Follow-Up Timeline:", ln=True)
+        pdf.set_font("helvetica", size=10)
+        for step in fu['follow_up_timeline']:
+            if isinstance(step, dict):
+                pdf.multi_cell(W, 6, safetext(f"  [{step.get('timeframe', '')}] {step.get('action', '')}"))
+            else:
+                pdf.multi_cell(W, 6, safetext(f"  - {step}"))
+
+    if fu.get('red_flags'):
+        pdf.ln(2)
+        pdf.set_font("helvetica", "B", 10)
+        pdf.set_text_color(200, 0, 0)
+        pdf.cell(W, 7, "Red Flags (Return to ED if):", ln=True)
+        pdf.set_font("helvetica", size=10)
+        pdf.set_text_color(40, 40, 40)
+        for flag in fu['red_flags']:
+            pdf.multi_cell(W, 6, safetext(f"  [!] {flag}"))
+
+    if fu.get('lifestyle_advice'):
+        pdf.ln(2)
+        pdf.set_font("helvetica", "B", 10)
+        pdf.set_text_color(40, 40, 40)
+        pdf.cell(30, 7, "Lifestyle:", ln=False)
+        pdf.set_font("helvetica", size=10)
+        pdf.multi_cell(W-30, 6, safetext(fu['lifestyle_advice']))
+
     return bytes(pdf.output())

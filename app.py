@@ -455,6 +455,37 @@ def generate_report(patient_data, results):
 ```text
 {results['memory_summary']}
 ```
+
+---
+
+## 💊 TREATMENT PLAN
+{chr(10).join('- ' + a for a in results.get('treatment_plan', {}).get('immediate_actions', ['N/A']))}
+
+**Monitoring:** {results.get('treatment_plan', {}).get('monitoring', 'N/A')}
+**Precautions:** {results.get('treatment_plan', {}).get('precautions', 'N/A')}
+
+---
+
+## 🏥 SPECIALIST REFERRAL
+* **Referral Needed:** {"Yes" if results.get('referral', {}).get('referral_needed') else "No"}
+* **Departments:** {', '.join(results.get('referral', {}).get('departments', ['None']))}
+* **Urgency:** {results.get('referral', {}).get('urgency', 'N/A')}
+* **Reasoning:** {results.get('referral', {}).get('reasoning', 'N/A')}
+
+---
+
+## 💬 PATIENT-FRIENDLY SUMMARY
+{results.get('patient_message', 'N/A')}
+
+---
+
+## 📋 FOLLOW-UP CARE PLAN
+**Discharge Instructions:** {results.get('follow_up', {}).get('discharge_instructions', 'N/A')}
+
+**Red Flags (Return to ED if):**
+{chr(10).join('- ⚠️ ' + f for f in results.get('follow_up', {}).get('red_flags', ['None']))}
+
+**Lifestyle Advice:** {results.get('follow_up', {}).get('lifestyle_advice', 'N/A')}
 """
     return report
 
@@ -644,7 +675,11 @@ if run_button:
         "Triage Agent": "🚨",
         "Conflict Resolver": "⚔️",
         "Bias Monitor": "⚖️",
-        "Explainability Agent": "💡"
+        "Explainability Agent": "💡",
+        "Treatment Planner": "💊",
+        "Specialist Referral": "🏥",
+        "Patient Communicator": "💬",
+        "Follow-Up Planner": "📋"
     }
     agent_actions = {
         "Temporal Memory Agent": "scanning patient history...",
@@ -652,7 +687,11 @@ if run_button:
         "Triage Agent": "scoring clinical urgency...",
         "Conflict Resolver": "resolving clinical mismatch...",
         "Bias Monitor": "auditing for demographic bias...",
-        "Explainability Agent": "writing doctor-friendly summary..."
+        "Explainability Agent": "writing doctor-friendly summary...",
+        "Treatment Planner": "generating evidence-based treatment plan...",
+        "Specialist Referral": "evaluating specialist department needs...",
+        "Patient Communicator": "composing patient-friendly message...",
+        "Follow-Up Planner": "scheduling follow-up care timeline..."
     }
 
     with status_container:
@@ -898,6 +937,108 @@ if "results" in st.session_state:
             timeline_html += '</div>'
             st.markdown(timeline_html, unsafe_allow_html=True)
 
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown("")
+
+    # ── Row 4: Treatment Plan + Specialist Referral ──
+    treat_col, ref_col = st.columns([1, 1])
+
+    with treat_col:
+        treatment = results.get("treatment_plan", {})
+        st.markdown('<div class="aria-card">', unsafe_allow_html=True)
+        st.markdown("#### 💊 Treatment Plan")
+        if treatment.get("immediate_actions"):
+            st.markdown("**Immediate Actions:**")
+            for action in treatment["immediate_actions"]:
+                st.markdown(f"- {action}")
+        if treatment.get("medications"):
+            st.markdown("**Medications:**")
+            for med in treatment["medications"]:
+                if isinstance(med, dict):
+                    st.markdown(f"- **{med.get('name', 'N/A')}** — {med.get('dosage', '')} {med.get('route', '')} {med.get('frequency', '')}")
+                else:
+                    st.markdown(f"- {med}")
+        if treatment.get("monitoring"):
+            st.markdown(f"**Monitoring:** {treatment['monitoring']}")
+        if treatment.get("precautions"):
+            st.warning(f"⚠️ {treatment['precautions']}")
+        if not treatment:
+            st.markdown("*No treatment plan generated.*")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    with ref_col:
+        referral = results.get("referral", {})
+        st.markdown('<div class="aria-card">', unsafe_allow_html=True)
+        st.markdown("#### 🏥 Specialist Referral")
+        if referral.get("referral_needed"):
+            urgency_colors = {"IMMEDIATE": "#f85149", "WITHIN_24H": "#d29922", "ROUTINE": "#3fb950"}
+            urg = referral.get("urgency", "ROUTINE")
+            urg_color = urgency_colors.get(urg, "#8b949e")
+            depts = ", ".join(referral.get("departments", []))
+            st.markdown(f"""
+                <p style="margin: 0.3rem 0;"><strong>Departments:</strong> {depts}</p>
+                <p style="margin: 0.3rem 0;"><strong>Urgency:</strong> <span style="color: {urg_color}; font-weight: 700;">{urg}</span></p>
+                <p style="margin: 0.3rem 0; color: #8b949e;"><strong>Reasoning:</strong> {referral.get('reasoning', '')}</p>
+            """, unsafe_allow_html=True)
+        else:
+            st.markdown("✅ No specialist referral needed at this time.")
+            if referral.get("reasoning"):
+                st.caption(referral["reasoning"])
+        if not referral:
+            st.markdown("*No referral data generated.*")
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown("")
+
+    # ── Row 5: Patient Message ──
+    patient_msg = results.get("patient_message", "")
+    if patient_msg:
+        st.markdown(f"""
+            <div class="aria-card" style="border-left: 4px solid #58a6ff;">
+                <h4 style="margin: 0 0 0.5rem 0;">💬 Patient-Friendly Summary</h4>
+                <p style="color: #e6edf3; font-size: 1.05rem; line-height: 1.6; font-style: italic;">
+                    "{patient_msg}"
+                </p>
+                <p style="color: #484f58; font-size: 0.8rem; margin: 0.5rem 0 0 0;">This message is written for the patient and their family in simple, compassionate language.</p>
+            </div>
+        """, unsafe_allow_html=True)
+
+    st.markdown("")
+
+    # ── Row 6: Follow-Up Plan ──
+    follow_up = results.get("follow_up", {})
+    if follow_up:
+        st.markdown('<div class="aria-card">', unsafe_allow_html=True)
+        st.markdown("#### 📋 Follow-Up Care Plan")
+        if follow_up.get("discharge_instructions"):
+            st.markdown(f"**Discharge Instructions:** {follow_up['discharge_instructions']}")
+        if follow_up.get("follow_up_timeline"):
+            st.markdown("**Follow-Up Timeline:**")
+            timeline_html = '<div style="display: flex; align-items: center; overflow-x: auto; gap: 0.25rem; padding: 0.5rem 0;">'
+            for i, step in enumerate(follow_up["follow_up_timeline"]):
+                if isinstance(step, dict):
+                    tf = step.get("timeframe", "")
+                    act = step.get("action", "")
+                else:
+                    tf = ""
+                    act = str(step)
+                timeline_html += f"""
+                    <div class="timeline-item" style="border-top: 3px solid #58a6ff;">
+                        <div style="color: #58a6ff; font-size: 0.75rem; font-weight: 700;">{tf}</div>
+                        <div style="color: #e6edf3; font-size: 0.8rem;">{act}</div>
+                    </div>
+                """
+                if i < len(follow_up["follow_up_timeline"]) - 1:
+                    timeline_html += '<span style="color: #30363d; font-size: 1.2rem;">→</span>'
+            timeline_html += '</div>'
+            st.markdown(timeline_html, unsafe_allow_html=True)
+        if follow_up.get("red_flags"):
+            st.markdown("**🚩 Red Flags (Return to ED immediately if):**")
+            for flag in follow_up["red_flags"]:
+                st.markdown(f"- ⚠️ {flag}")
+        if follow_up.get("lifestyle_advice"):
+            st.markdown(f"**🌿 Lifestyle Advice:** {follow_up['lifestyle_advice']}")
         st.markdown('</div>', unsafe_allow_html=True)
 
     # ── Row 4: Memory + Export ──

@@ -15,6 +15,10 @@ from agents.uncertainty import compute_uncertainty
 from agents.triage import run_triage
 from agents.conflict_resolver import detect_conflict, resolve_conflict
 from agents.explainability import run_explainability
+from agents.treatment_planner import run_treatment_plan
+from agents.specialist_referral import run_specialist_referral
+from agents.patient_communicator import run_patient_communication
+from agents.follow_up import run_follow_up
 from bias.audit import run_bias_audit
 from utils.sdg_tracker import increment_triaged, increment_bias_flagged
 
@@ -35,6 +39,10 @@ class AgentState(TypedDict):
     triage_result: Optional[Dict[str, Any]]
     bias_result: Optional[Dict[str, Any]]
     doctor_summary: Optional[str]
+    treatment_plan: Optional[Dict[str, Any]]
+    referral_result: Optional[Dict[str, Any]]
+    patient_message: Optional[str]
+    follow_up_plan: Optional[Dict[str, Any]]
     
     # Internal metrics
     reanalyzed: bool
@@ -204,8 +212,111 @@ def explainability_node(state: AgentState):
     return {"doctor_summary": summary}
 
 
+def treatment_planner_node(state: AgentState):
+    """Node 7: Generates an evidence-based treatment plan."""
+    status_callback = state.get("status_callback")
+    if status_callback:
+        status_callback("Treatment Planner", "planning")
+        
+    patient_data = state["patient_data"]
+    diagnosis_result = state["diagnosis_result"]
+    triage_result = state["triage_result"]
+    
+    treatment = run_treatment_plan(
+        model=state["model"],
+        diagnosis=diagnosis_result["diagnosis"],
+        confidence=diagnosis_result["confidence"],
+        triage_level=triage_result["triage_level"],
+        age=patient_data.get("age", 0),
+        gender=patient_data.get("gender", ""),
+        history=patient_data.get("history", "None"),
+        vitals=patient_data.get("vitals", ""),
+        labs=patient_data.get("labs", "")
+    )
+    
+    if status_callback:
+        status_callback("Treatment Planner", "done")
+        
+    return {"treatment_plan": treatment}
+
+
+def specialist_referral_node(state: AgentState):
+    """Node 8: Determines if specialist referral is needed."""
+    status_callback = state.get("status_callback")
+    if status_callback:
+        status_callback("Specialist Referral", "evaluating")
+        
+    patient_data = state["patient_data"]
+    diagnosis_result = state["diagnosis_result"]
+    
+    referral = run_specialist_referral(
+        model=state["model"],
+        diagnosis=diagnosis_result["diagnosis"],
+        confidence=diagnosis_result["confidence"],
+        triage_level=state["triage_result"]["triage_level"],
+        age=patient_data.get("age", 0),
+        gender=patient_data.get("gender", ""),
+        history=patient_data.get("history", "None"),
+        indicators=diagnosis_result.get("indicators", "")
+    )
+    
+    if status_callback:
+        status_callback("Specialist Referral", "done")
+        
+    return {"referral_result": referral}
+
+
+def patient_communicator_node(state: AgentState):
+    """Node 9: Generates a compassionate patient-facing message."""
+    status_callback = state.get("status_callback")
+    if status_callback:
+        status_callback("Patient Communicator", "composing")
+        
+    patient_data = state["patient_data"]
+    
+    message = run_patient_communication(
+        model=state["model"],
+        diagnosis=state["diagnosis_result"]["diagnosis"],
+        confidence=state["diagnosis_result"]["confidence"],
+        triage_level=state["triage_result"]["triage_level"],
+        treatment_plan=state.get("treatment_plan", {}),
+        referral=state.get("referral_result", {}),
+        patient_name=patient_data.get("name", "Patient"),
+        age=patient_data.get("age", 0)
+    )
+    
+    if status_callback:
+        status_callback("Patient Communicator", "done")
+        
+    return {"patient_message": message}
+
+
+def follow_up_node(state: AgentState):
+    """Node 10: Generates follow-up care timeline and discharge plan."""
+    status_callback = state.get("status_callback")
+    if status_callback:
+        status_callback("Follow-Up Planner", "scheduling")
+        
+    patient_data = state["patient_data"]
+    
+    follow_up = run_follow_up(
+        model=state["model"],
+        diagnosis=state["diagnosis_result"]["diagnosis"],
+        triage_level=state["triage_result"]["triage_level"],
+        treatment_plan=state.get("treatment_plan", {}),
+        referral=state.get("referral_result", {}),
+        age=patient_data.get("age", 0),
+        history=patient_data.get("history", "None")
+    )
+    
+    if status_callback:
+        status_callback("Follow-Up Planner", "done")
+        
+    return {"follow_up_plan": follow_up}
+
+
 def save_visit_node(state: AgentState):
-    """Node 7: Saves the visit to memory and updates counters."""
+    """Node 11: Saves the visit to memory and updates counters."""
     patient_data = state["patient_data"]
     diagnosis_result = state["diagnosis_result"]
     triage_result = state["triage_result"]
@@ -260,6 +371,10 @@ workflow.add_node("triage", triage_node)
 workflow.add_node("conflict_resolver", conflict_resolver_node)
 workflow.add_node("bias_audit", bias_audit_node)
 workflow.add_node("explainability", explainability_node)
+workflow.add_node("treatment_planner", treatment_planner_node)
+workflow.add_node("specialist_referral", specialist_referral_node)
+workflow.add_node("patient_communicator", patient_communicator_node)
+workflow.add_node("follow_up", follow_up_node)
 workflow.add_node("save_visit", save_visit_node)
 
 # PARALLEL EXECUTION: Both memory and initial diagnosis start off simultaneously
@@ -293,9 +408,15 @@ workflow.add_conditional_edges(
 # Conflict resolver goes back into the main flow
 workflow.add_edge("conflict_resolver", "bias_audit")
 
-# Linear flow for the rest
+# Linear flow through the remaining agents
 workflow.add_edge("bias_audit", "explainability")
-workflow.add_edge("explainability", "save_visit")
+workflow.add_edge("explainability", "treatment_planner")
+
+# Treatment Planner and Specialist Referral can run in parallel
+workflow.add_edge("treatment_planner", "specialist_referral")
+workflow.add_edge("specialist_referral", "patient_communicator")
+workflow.add_edge("patient_communicator", "follow_up")
+workflow.add_edge("follow_up", "save_visit")
 workflow.add_edge("save_visit", END)
 
 # Compile graph
@@ -317,6 +438,10 @@ def run_pipeline(model: genai.GenerativeModel, patient_data: dict, status_callba
         "triage_result": None,
         "bias_result": None,
         "doctor_summary": None,
+        "treatment_plan": None,
+        "referral_result": None,
+        "patient_message": None,
+        "follow_up_plan": None,
         "reanalyzed": False,
         "conflict_detected": False,
         "model_used": None
@@ -332,6 +457,10 @@ def run_pipeline(model: genai.GenerativeModel, patient_data: dict, status_callba
         "triage": final_state.get("triage_result", {}),
         "bias_report": final_state.get("bias_result", {}),
         "doctor_summary": final_state.get("doctor_summary", ""),
+        "treatment_plan": final_state.get("treatment_plan", {}),
+        "referral": final_state.get("referral_result", {}),
+        "patient_message": final_state.get("patient_message", ""),
+        "follow_up": final_state.get("follow_up_plan", {}),
         "reanalyzed": final_state.get("reanalyzed", False),
         "conflict": final_state.get("conflict_detected", False),
         "model_used": final_state.get("model_used", "DeepSeek-R1:8b (Local)")

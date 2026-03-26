@@ -2,7 +2,7 @@ streamlit>=1.35.0
 google-generativeai
 pandas
 SpeechRecognition
-fpdf
+fpdf2
 langgraph
 chromadb
 matplotlib
