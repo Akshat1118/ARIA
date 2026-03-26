@@ -19,7 +19,7 @@ env/
 .venv/
 
 # SQLite Databases (auto-generated at runtime)
-database/*.db
+database/
 
 # IDE / Editor
 .vscode/
