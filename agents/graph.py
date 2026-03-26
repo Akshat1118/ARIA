@@ -75,9 +75,9 @@ def initial_diagnostic_node(state: AgentState):
         
     patient_data = state["patient_data"]
     
-    # Diagnosis runs on LOCAL DeepSeek-R1 model via Ollama — zero API calls
+    # Diagnosis runs on Gemini API
     diagnosis_result = compute_uncertainty(
-        model=None,  # Not needed — uses local DeepSeek-R1
+        model=state.get("model"),
         symptoms=patient_data.get("symptoms", ""),
         vitals=patient_data.get("vitals", ""),
         labs=patient_data.get("labs", ""),
@@ -108,9 +108,9 @@ def reanalyze_diagnostic_node(state: AgentState):
     if memory_summary != "No previous visits found for this patient.":
         combined_history += f"\n\nPrevious Visits:\n{memory_summary}"
         
-    # Re-run on LOCAL DeepSeek-R1 with enriched history
+    # Re-run on Gemini API with enriched history
     diagnosis_result = compute_uncertainty(
-        model=None,  # Not needed — uses local DeepSeek-R1
+        model=state.get("model"),
         symptoms=patient_data.get("symptoms", ""),
         vitals=patient_data.get("vitals", ""),
         labs=patient_data.get("labs", ""),

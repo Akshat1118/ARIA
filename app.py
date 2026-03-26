@@ -531,6 +531,12 @@ with st.sidebar:
             st.error(f"Transcription error: {e}")
 
     st.markdown("---")
+    
+    # ── Medical Scan Input ──
+    st.markdown("### 👁️ Medical Scan (Vision)")
+    scan_upload = st.file_uploader("Upload X-Ray, MRI, or Dermoscopy", type=["png", "jpg", "jpeg"], key="scan_upload")
+
+    st.markdown("---")
     st.markdown("### 📋 Patient Information")
 
     # Load sample patients
@@ -641,12 +647,25 @@ if run_button:
     genai.configure(api_key=api_key)
     model = genai.GenerativeModel(selected_model)
 
+    # ── Process Vision Sub-Agent ──
+    vision_findings = ""
+    if scan_upload is not None:
+        with st.spinner("👁️ Analyzing medical scan with Gemini Vision..."):
+            try:
+                from utils.vision_parser import analyze_medical_image
+                vision_text = analyze_medical_image(scan_upload.getvalue(), selected_model)
+                vision_findings = f"\n\n[Visual Scan Findings]:\n{vision_text}"
+            except Exception as e:
+                st.error(f"⚠️ Medical Scan Parsing Failed: {e}")
+
+    final_symptoms = symptoms + vision_findings if vision_findings else symptoms
+
     patient_data = {
         "patient_id": patient_id or f"P-{int(time.time())}",
         "name": patient_name or "Unknown Patient",
         "age": age,
         "gender": gender,
-        "symptoms": symptoms,
+        "symptoms": final_symptoms,
         "vitals": vitals or "Not provided",
         "labs": labs or "Not provided",
         "history": history or "Not provided",
@@ -735,6 +754,10 @@ if run_button:
         st.session_state["results"] = results
         st.session_state["patient_data"] = patient_data
         st.session_state["last_run_hash"] = current_hash
+        if scan_upload is not None:
+            st.session_state["scan_image_bytes"] = scan_upload.getvalue()
+        else:
+            st.session_state.pop("scan_image_bytes", None)
     except Exception as e:
         import traceback
         error_msg = traceback.format_exc()
@@ -802,6 +825,9 @@ if "results" in st.session_state:
 
     st.markdown("### 📊 Results Dashboard")
     st.caption(f"Patient: **{patient_data.get('name', 'Unknown')}** (ID: {patient_data.get('patient_id', 'N/A')}) — {datetime.now().strftime('%Y-%m-%d %H:%M')}")
+
+    if "scan_image_bytes" in st.session_state:
+        st.image(st.session_state["scan_image_bytes"], caption="Uploaded Medical Scan Used for Analysis", width=350)
 
     # ── Row 1: Diagnosis + Confidence Gauge + Triage ──
     res_col1, res_col2, res_col3 = st.columns([3, 1.5, 2.5])
