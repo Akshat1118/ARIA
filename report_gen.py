@@ -500,20 +500,32 @@ def generate_pdf_report(patient_data, results, translated_content=None, target_l
     pdf=MedPDF('P','mm','A4'); pdf.alias_nb_pages(); pdf.set_auto_page_break(True,15)
     charts=[]
 
-    # Load Hindi/Devanagari font for translated pages
-    hindi_font_loaded = False
-    if translated_content:
-        try:
-            pdf.add_font('hindi', '', '/System/Library/Fonts/Kohinoor.ttc')
-            pdf.add_font('hindi', 'B', '/System/Library/Fonts/Kohinoor.ttc')
-            hindi_font_loaded = True
-        except:
-            try:
-                pdf.add_font('hindi', '', '/System/Library/Fonts/Supplemental/DevanagariMT.ttc')
-                pdf.add_font('hindi', 'B', '/System/Library/Fonts/Supplemental/DevanagariMT.ttc')
-                hindi_font_loaded = True
-            except:
-                hindi_font_loaded = False
+    # Load language-specific font for translated pages
+    lang_font_loaded = False
+    
+    font_map = {
+        'Hindi': ['/System/Library/Fonts/Kohinoor.ttc', '/System/Library/Fonts/Supplemental/DevanagariMT.ttc'],
+        'Marathi': ['/System/Library/Fonts/Kohinoor.ttc', '/System/Library/Fonts/Supplemental/DevanagariMT.ttc'],
+        'Tamil': ['/System/Library/Fonts/Supplemental/MuktaMahee.ttc', '/System/Library/Fonts/Supplemental/Tamil Sangam MN.ttc', '/System/Library/Fonts/MuktaMahee.ttc'],
+        'Telugu': ['/System/Library/Fonts/KohinoorTelugu.ttc', '/System/Library/Fonts/Supplemental/Telugu Sangam MN.ttc'],
+        'Bengali': ['/System/Library/Fonts/KohinoorBangla.ttc', '/System/Library/Fonts/Supplemental/Bangla Sangam MN.ttc'],
+        'Gujarati': ['/System/Library/Fonts/KohinoorGujarati.ttc', '/System/Library/Fonts/Supplemental/Gujarati Sangam MN.ttc'],
+        'Kannada': ['/System/Library/Fonts/Supplemental/Kannada Sangam MN.ttc', '/System/Library/Fonts/Supplemental/KannadaMN.ttc'],
+        'Malayalam': ['/System/Library/Fonts/Supplemental/Malayalam Sangam MN.ttc', '/System/Library/Fonts/Supplemental/MalayalamMN.ttc'],
+        'Punjabi': ['/System/Library/Fonts/Supplemental/Gurmukhi MN.ttc', '/System/Library/Fonts/Supplemental/MuktaMahee.ttc'] # Fallback
+    }
+
+    if translated_content and target_language in font_map:
+        for font_path in font_map[target_language]:
+            if os.path.exists(font_path):
+                try:
+                    pdf.add_font('local_lang', '', font_path)
+                    pdf.add_font('local_lang', 'B', font_path)
+                    lang_font_loaded = True
+                    break
+                except Exception as e:
+                    print(f"Failed to load {font_path}: {e}")
+                    pass
 
     # ═══════════ PAGE 1: EXECUTIVE SUMMARY ═══════════
     pdf.add_page(); pdf._topbar()
@@ -741,41 +753,49 @@ def generate_pdf_report(patient_data, results, translated_content=None, target_l
         'For detailed medical information, refer to the earlier pages or speak with your doctor.'
     ))
 
-    # ═══════════ PAGE 6: HINDI TRANSLATION (Sarvam AI) ═══════════
-    if translated_content and hindi_font_loaded:
+    # ═══════════ PAGE 6: TRANSLATED CONTENT (Sarvam AI) ═══════════
+    if translated_content and lang_font_loaded:
         lang_name = target_language or 'Hindi'
         pdf.add_page(); pdf._topbar()
 
         # Header with language badge
         pdf.set_y(12); pdf.set_fill_color(*SKY); pdf.rect(12,10,186,16,'F')
-        pdf.set_y(11); pdf.set_font('hindi','B',14); pdf.set_text_color(*NAVY); pdf.set_x(16)
+        pdf.set_y(11); pdf.set_font('local_lang','B',14); pdf.set_text_color(*NAVY); pdf.set_x(16)
         title_text = translated_content.get('title', 'Your Health Report')
         pdf.cell(100,10,title_text,ln=False)
         pdf._badge(150,13,f'Powered by Sarvam AI',ACCENT)
-        pdf.set_y(20); pdf.set_font('hindi','',8); pdf.set_text_color(*GRAY); pdf.set_x(16)
+        pdf.set_y(20); pdf.set_font('local_lang','',8); pdf.set_text_color(*GRAY); pdf.set_x(16)
         pdf.cell(0,4,f'Translated to {lang_name} for patient accessibility',ln=True)
         pdf.ln(6)
 
         # What we found - translated
         wy2=pdf.get_y(); pdf._card(12,wy2,186,30)
-        pdf.set_y(wy2+3); pdf.set_font('hindi','B',11); pdf.set_text_color(*NAVY); pdf.set_x(16)
+        pdf.set_y(wy2+3); pdf.set_font('local_lang','B',11); pdf.set_text_color(*NAVY); pdf.set_x(16)
         pdf.cell(0,6,translated_content.get('what_found',''),ln=True)
-        pdf.set_font('hindi','',9); pdf.set_text_color(*BLACK); pdf.set_x(16)
-        pdf.multi_cell(172,5,translated_content.get('patient_summary',''))
+        pdf.set_font('local_lang','',9); pdf.set_text_color(*BLACK); pdf.set_x(16)
+        
+        # FPDF can't handle some zero-width joiners in Malayalam/Tamil well. Just output string as is.
+        try:
+            pdf.multi_cell(172,5,translated_content.get('patient_summary',''))
+        except Exception:
+            pdf.multi_cell(172,5, "Translation rendering error: Font unsupported.")
         pdf.set_y(wy2+34)
 
         # What to expect - translated
         expect_items = translated_content.get('what_to_expect',[])
         ey2=pdf.get_y(); eh2=8+len(expect_items)*6
         pdf._card(12,ey2,186,eh2); pdf.set_y(ey2+3)
-        pdf.set_font('hindi','B',11); pdf.set_text_color(*NAVY); pdf.set_x(16)
+        pdf.set_font('local_lang','B',11); pdf.set_text_color(*NAVY); pdf.set_x(16)
         pdf.cell(0,6,translated_content.get('what_expect',''),ln=True)
-        pdf.set_font('hindi','',9); pdf.set_text_color(*BLACK)
+        pdf.set_font('local_lang','',9); pdf.set_text_color(*BLACK)
         for item in expect_items:
-            pdf.set_x(18); pdf.set_text_color(*TEAL); pdf.set_font('hindi','B',9)
+            pdf.set_x(18); pdf.set_text_color(*TEAL); pdf.set_font('local_lang','B',9)
             pdf.cell(5,6,'-',ln=False)
-            pdf.set_font('hindi','',9); pdf.set_text_color(*BLACK)
-            pdf.cell(0,6,item,ln=True)
+            pdf.set_font('local_lang','',9); pdf.set_text_color(*BLACK)
+            try:
+                pdf.cell(0,6,item,ln=True)
+            except:
+                pdf.cell(0,6,'Error',ln=True)
         pdf.set_y(ey2+eh2+4)
 
         # Warning signs - translated
@@ -784,19 +804,24 @@ def generate_pdf_report(patient_data, results, translated_content=None, target_l
         pdf.set_fill_color(255,245,245); ih2=8+len(red_items)*6
         pdf.rect(12,iy3,186,ih2,'F')
         pdf.set_draw_color(*RED); pdf.set_line_width(0.3); pdf.rect(12,iy3,186,ih2,'D')
-        pdf.set_y(iy3+3); pdf.set_font('hindi','B',11); pdf.set_text_color(*RED); pdf.set_x(16)
+        pdf.set_y(iy3+3); pdf.set_font('local_lang','B',11); pdf.set_text_color(*RED); pdf.set_x(16)
         pdf.cell(0,6,translated_content.get('when_help',''),ln=True)
-        pdf.set_font('hindi','',9); pdf.set_text_color(*BLACK)
+        pdf.set_font('local_lang','',9); pdf.set_text_color(*BLACK)
         for item in red_items:
-            pdf.set_x(18); pdf.set_text_color(*RED); pdf.set_font('hindi','B',9)
+            pdf.set_x(18); pdf.set_text_color(*RED); pdf.set_font('local_lang','B',9)
             pdf.cell(5,6,'!',ln=False)
-            pdf.set_font('hindi','',9); pdf.set_text_color(*BLACK)
-            pdf.cell(0,6,item,ln=True)
+            pdf.set_font('local_lang','',9); pdf.set_text_color(*BLACK)
+            try:
+                pdf.cell(0,6,item,ln=True)
+            except:
+                pdf.cell(0,6,'Error',ln=True)
 
-        pdf.ln(8); pdf.set_font('hindi','',7); pdf.set_text_color(*GRAY)
+        pdf.ln(8); pdf.set_font('local_lang','',7); pdf.set_text_color(*GRAY)
         disc = translated_content.get('disclaimer','')
         if disc:
-            pdf.multi_cell(0,3.5,disc)
+            try:
+                pdf.multi_cell(0,3.5,disc)
+            except: pass
 
     # ═══════════ DOCTOR SUMMARY + AUDIT ═══════════
     pdf.add_page(); pdf._topbar()
