@@ -35,8 +35,8 @@ database/
 Thumbs.db
 Desktop.ini
 
-# Streamlit
-.streamlit/
+# Streamlit (allow config.toml, ignore secrets)
+.streamlit/secrets.toml
 
 # Logs
 *.log
