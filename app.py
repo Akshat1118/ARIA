@@ -12,6 +12,8 @@ import time
 from datetime import datetime
 from report_gen import generate_pdf_report
 from sarvam_translate import translate_patient_report, SUPPORTED_LANGUAGES
+import requests
+from streamlit_lottie import st_lottie
 
 try:
     from dotenv import load_dotenv
@@ -46,317 +48,173 @@ st.set_page_config(
 # ──────────────────────────────────────────
 st.markdown("""
 <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
 
     /* ══════════════════════════════════════════
-       GLOBAL — Force all text to light colors
+       GLOBAL — Clear Light Theme (Premium)
        ══════════════════════════════════════════ */
     .stApp {
-        background: linear-gradient(135deg, #0a0e27 0%, #0d1b3e 50%, #0a1628 100%);
+        background-color: #f8fafc;
         font-family: 'Inter', sans-serif;
-        color: #e6edf3;
+        color: #0f172a;
     }
 
-    /* Force ALL text white/light */
+    /* Force default text to dark slate */
     .stApp, .stApp * {
-        color: #e6edf3;
+        color: #0f172a;
+    }
+    .stMarkdown p, .stMarkdown span, .stMarkdown li {
+        color: #334155 !important;
+        line-height: 1.6;
     }
 
     /* ── Sidebar ── */
     section[data-testid="stSidebar"] {
-        background: linear-gradient(180deg, #0d1b3e 0%, #0a1628 100%);
-        border-right: 1px solid rgba(56, 139, 253, 0.2);
+        background-color: #ffffff;
+        border-right: 1px solid #e2e8f0;
     }
-    section[data-testid="stSidebar"] * { color: #c9d1d9; }
-    section[data-testid="stSidebar"] h1, section[data-testid="stSidebar"] h2,
-    section[data-testid="stSidebar"] h3, section[data-testid="stSidebar"] h4 {
-        color: #e6edf3 !important;
+    section[data-testid="stSidebar"] h1, section[data-testid="stSidebar"] h2 {
+        color: #0f172a !important;
+        font-weight: 800 !important;
     }
 
     /* ── Headers ── */
     h1, h2, h3, h4, h5, h6 {
-        color: #e6edf3 !important;
-        font-family: 'Inter', sans-serif !important;
+        color: #0f172a !important;
+        font-weight: 700 !important;
+        letter-spacing: -0.025em;
     }
     h1 {
-        background: linear-gradient(90deg, #58a6ff, #3fb950, #58a6ff);
+        background: linear-gradient(90deg, #2563eb, #0284c7);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
-        font-weight: 700 !important;
+        font-weight: 800 !important;
     }
 
-    /* ── All text elements ── */
-    .stMarkdown, .stMarkdown p, .stMarkdown span, .stMarkdown li,
-    .stMarkdown td, .stMarkdown th,
-    p, span, label, div, li, td, th, dt, dd, figcaption {
-        color: #c9d1d9 !important;
+    /* ── Form Labels & Small Text ── */
+    .stCaption, [data-testid="stCaptionContainer"] *, label {
+        color: #64748b !important;
     }
-
-    /* ── Captions ── */
-    .stCaption, [data-testid="stCaptionContainer"],
-    [data-testid="stCaptionContainer"] * {
-        color: #8b949e !important;
-    }
-
-    /* ── Form Labels ── */
-    .stTextInput label, .stTextArea label, .stNumberInput label,
-    .stSelectbox label, .stCheckbox label, .stRadio label,
-    .stSlider label, .stDateInput label, .stTimeInput label,
-    .stFileUploader label, .stMultiSelect label,
-    [data-testid="stWidgetLabel"], [data-testid="stWidgetLabel"] * {
-        color: #c9d1d9 !important;
-    }
+    label { font-weight: 500 !important; }
 
     /* ── Input Fields ── */
     .stTextInput > div > div > input,
     .stTextArea > div > div > textarea,
-    .stNumberInput > div > div > input {
-        background-color: #161b33 !important;
-        color: #e6edf3 !important;
-        border: 1px solid rgba(56, 139, 253, 0.3) !important;
+    .stNumberInput > div > div > input,
+    .stSelectbox > div > div > div {
+        background-color: #ffffff !important;
+        color: #0f172a !important;
+        border: 1px solid #cbd5e1 !important;
         border-radius: 8px !important;
-    }
-    .stTextInput > div > div > input::placeholder,
-    .stTextArea > div > div > textarea::placeholder {
-        color: #484f58 !important;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+        transition: all 0.2s ease;
     }
     .stTextInput > div > div > input:focus,
     .stTextArea > div > div > textarea:focus {
-        border-color: #58a6ff !important;
-        box-shadow: 0 0 12px rgba(56, 139, 253, 0.3) !important;
+        border-color: #3b82f6 !important;
+        box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2) !important;
     }
 
-    /* ── Selectbox / Dropdown ── */
-    .stSelectbox > div > div > div,
-    .stSelectbox [data-baseweb="select"],
-    .stSelectbox [data-baseweb="select"] * {
-        background-color: #161b33 !important;
-        color: #e6edf3 !important;
-        border-color: rgba(56, 139, 253, 0.3) !important;
-    }
-    /* Dropdown menu items */
-    [data-baseweb="popover"], [data-baseweb="popover"] *,
-    [data-baseweb="menu"], [data-baseweb="menu"] *,
-    [role="listbox"], [role="listbox"] *,
-    [role="option"], [role="option"] * {
-        background-color: #161b33 !important;
-        color: #e6edf3 !important;
-    }
-    [role="option"]:hover {
-        background-color: #1a2744 !important;
-    }
-
-    /* ── Checkbox / Radio ── */
-    .stCheckbox label span, .stRadio label span,
-    .stCheckbox > label, .stRadio > label,
-    [data-testid="stCheckbox"] *, [data-testid="stRadio"] * {
-        color: #c9d1d9 !important;
-    }
-
-    /* ── Number Input Buttons ── */
-    .stNumberInput button {
-        color: #e6edf3 !important;
-        background-color: #1a2744 !important;
-        border-color: rgba(56, 139, 253, 0.3) !important;
-    }
+    /* Dropdown Menus */
+    [data-baseweb="popover"] *, [role="listbox"] * { color: #0f172a !important; }
+    [role="option"]:hover { background-color: #f1f5f9 !important; }
 
     /* ── Buttons ── */
     .stButton > button {
-        background: linear-gradient(135deg, #1a5fb4, #2374d4) !important;
+        background: #2563eb !important;
         color: #ffffff !important;
         border: none !important;
         border-radius: 8px !important;
         font-weight: 600 !important;
         padding: 0.6rem 2rem !important;
-        transition: all 0.3s ease !important;
-        box-shadow: 0 4px 15px rgba(35, 116, 212, 0.3) !important;
+        transition: all 0.2s ease !important;
+        box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2) !important;
     }
     .stButton > button:hover {
-        background: linear-gradient(135deg, #2374d4, #58a6ff) !important;
-        box-shadow: 0 6px 25px rgba(56, 139, 253, 0.5) !important;
+        background: #1d4ed8 !important;
         transform: translateY(-1px) !important;
-    }
-
-    /* ── Expander ── */
-    div[data-testid="stExpander"] {
-        background-color: rgba(13, 27, 62, 0.8) !important;
-        border: 1px solid rgba(56, 139, 253, 0.15) !important;
-        border-radius: 12px !important;
-    }
-    div[data-testid="stExpander"] summary, div[data-testid="stExpander"] summary *,
-    div[data-testid="stExpander"] * {
-        color: #c9d1d9 !important;
-    }
-    div[data-testid="stExpander"] summary svg {
-        fill: #58a6ff !important;
-    }
-
-    /* ── Alert Messages (warning, error, success, info) ── */
-    .stAlert, .stAlert * {
-        color: #e6edf3 !important;
-    }
-    div[data-testid="stNotification"] * {
-        color: #e6edf3 !important;
-    }
-
-    /* ── Progress Bar ── */
-    .stProgress > div > div > div > div {
-        background-color: #58a6ff !important;
-    }
-    .stProgress [data-testid="stMarkdownContainer"] * {
-        color: #c9d1d9 !important;
-    }
-
-    /* ── Dataframe / Table ── */
-    .stDataFrame, .stDataFrame * {
-        color: #e6edf3 !important;
-    }
-    [data-testid="stDataFrame"] {
-        background-color: rgba(13, 27, 62, 0.6) !important;
-    }
-
-    /* ── Tabs ── */
-    .stTabs [data-baseweb="tab-list"] { gap: 4px; }
-    .stTabs [data-baseweb="tab"] {
-        background-color: rgba(13, 27, 62, 0.6) !important;
-        border: 1px solid rgba(56, 139, 253, 0.2) !important;
-        border-radius: 8px 8px 0 0 !important;
-        color: #8b949e !important;
-    }
-    .stTabs [aria-selected="true"] {
-        background-color: rgba(56, 139, 253, 0.15) !important;
-        color: #58a6ff !important;
-        border-bottom: 2px solid #58a6ff !important;
-    }
-
-    /* ── Metric Cards ── */
-    div[data-testid="stMetric"] {
-        background: rgba(13, 27, 62, 0.6);
-        border: 1px solid rgba(56, 139, 253, 0.2);
-        border-radius: 12px; padding: 1rem;
-    }
-    div[data-testid="stMetric"] label { color: #8b949e !important; }
-    div[data-testid="stMetric"] [data-testid="stMetricValue"] { color: #58a6ff !important; }
-
-    /* ── Audio Input ── */
-    [data-testid="stAudioInput"] *, .stAudioInput * {
-        color: #c9d1d9 !important;
+        box-shadow: 0 6px 8px -1px rgba(37, 99, 235, 0.3) !important;
     }
 
     /* ══════════════════════════════════════════
        CUSTOM COMPONENT STYLES
        ══════════════════════════════════════════ */
 
-    /* ── Card Styles ── */
+    /* ── Beautiful Premium Cards ── */
     .aria-card {
-        background: rgba(13, 27, 62, 0.6);
-        border: 1px solid rgba(56, 139, 253, 0.2);
-        border-radius: 12px;
+        background: #ffffff;
+        border: 1px solid #e2e8f0;
+        border-radius: 16px;
         padding: 1.5rem;
         margin: 0.5rem 0;
-        backdrop-filter: blur(10px);
-        transition: all 0.3s ease;
+        box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+        transition: transform 0.2s ease, box-shadow 0.2s ease;
     }
     .aria-card:hover {
-        border-color: rgba(56, 139, 253, 0.5);
-        box-shadow: 0 4px 20px rgba(56, 139, 253, 0.15);
         transform: translateY(-2px);
+        box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
     }
-    .aria-card-critical { border-left: 4px solid #f85149; background: rgba(248, 81, 73, 0.08); }
-    .aria-card-high { border-left: 4px solid #d29922; background: rgba(210, 153, 34, 0.08); }
-    .aria-card-moderate { border-left: 4px solid #58a6ff; background: rgba(88, 166, 255, 0.08); }
-    .aria-card-low { border-left: 4px solid #3fb950; background: rgba(63, 185, 80, 0.08); }
+    
+    .aria-card-critical { border-top: 4px solid #ef4444; }
+    .aria-card-high { border-top: 4px solid #f59e0b; }
+    .aria-card-moderate { border-top: 4px solid #3b82f6; }
+    .aria-card-low { border-top: 4px solid #10b981; }
 
-    /* ── Triage Badges ── */
+    /* ── Triage Badges (Soft Pastel with Vibrant Text) ── */
     .triage-badge {
-        display: inline-block; padding: 0.4rem 1.2rem; border-radius: 20px;
-        font-weight: 700; font-size: 1rem; letter-spacing: 1px;
-        animation: badge-pulse 2s infinite;
+        display: inline-block; padding: 0.35rem 1.2rem; border-radius: 9999px;
+        font-weight: 700; font-size: 0.85rem; letter-spacing: 0.5px; text-transform: uppercase;
     }
-    @keyframes badge-pulse {
-        0%, 100% { opacity: 1; }
-        50% { opacity: 0.85; }
-    }
-    .triage-critical { background: linear-gradient(135deg, #da3633, #f85149); color: white !important; }
-    .triage-high { background: linear-gradient(135deg, #9e6a03, #d29922); color: white !important; }
-    .triage-moderate { background: linear-gradient(135deg, #1a5fb4, #58a6ff); color: white !important; }
-    .triage-low { background: linear-gradient(135deg, #238636, #3fb950); color: white !important; }
+    .triage-critical { background: #fee2e2; color: #b91c1c !important; border: 1px solid #fca5a5; }
+    .triage-high { background: #fef3c7; color: #b45309 !important; border: 1px solid #fcd34d; }
+    .triage-moderate { background: #dbeafe; color: #1d4ed8 !important; border: 1px solid #bfdbfe; }
+    .triage-low { background: #d1fae5; color: #047857 !important; border: 1px solid #a7f3d0; }
 
-    /* ── Agent Status ── */
+    /* ── Agent Status Indicators ── */
     .agent-status {
-        padding: 0.6rem 1rem; margin: 0.3rem 0; border-radius: 8px;
-        font-family: 'Inter', monospace; font-size: 0.9rem;
-        transition: all 0.3s ease;
+        padding: 0.75rem 1rem; margin: 0.4rem 0; border-radius: 8px;
+        font-family: 'Inter', sans-serif; font-size: 0.95rem; font-weight: 500;
+        background: #ffffff; border: 1px solid #e2e8f0;
+        box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.03);
     }
     .agent-running {
-        background: rgba(56, 139, 253, 0.1); border-left: 3px solid #58a6ff;
-        color: #58a6ff !important; animation: agent-glow 1.5s ease-in-out infinite;
-    }
-    @keyframes agent-glow {
-        0%, 100% { box-shadow: 0 0 5px rgba(56, 139, 253, 0.2); }
-        50% { box-shadow: 0 0 15px rgba(56, 139, 253, 0.4); }
+        border-left: 4px solid #3b82f6; color: #1e40af !important; background: #eff6ff;
     }
     .agent-done {
-        background: rgba(63, 185, 80, 0.1); border-left: 3px solid #3fb950; color: #3fb950 !important;
+        border-left: 4px solid #10b981; color: #065f46 !important; background: #f0fdf4;
     }
 
-    .bias-pass { color: #3fb950 !important; }
-    .bias-flag { color: #f85149 !important; }
+    .bias-pass { color: #059669 !important; font-weight: 600; }
+    .bias-flag { color: #dc2626 !important; font-weight: 600; }
 
+    /* ── Dashboard Top Bars ── */
     .sdg-bar {
-        background: linear-gradient(135deg, rgba(13, 27, 62, 0.8), rgba(35, 116, 212, 0.2));
-        border: 1px solid rgba(56, 139, 253, 0.3);
+        background: #f8fafc;
+        border: 1px solid #e2e8f0;
         border-radius: 12px; padding: 1rem 1.5rem; text-align: center;
+        box-shadow: inset 0 2px 4px 0 rgba(0, 0, 0, 0.02);
     }
 
+    /* ── Timeline ── */
     .timeline-item {
         display: inline-block; text-align: center; padding: 0.5rem 1rem;
         margin: 0 0.25rem; border-radius: 8px;
-        background: rgba(13, 27, 62, 0.6); border: 1px solid rgba(56, 139, 253, 0.2);
+        background: #ffffff; border: 1px solid #e2e8f0;
         min-width: 120px; transition: all 0.3s ease;
     }
-    .timeline-item:hover {
-        border-color: rgba(56, 139, 253, 0.5);
-        transform: translateY(-2px);
-    }
+    .timeline-item:hover { border-color: #cbd5e1; transform: translateY(-2px); }
 
-    hr { border-color: rgba(56, 139, 253, 0.2) !important; }
-
-    /* ── Confidence Gauge ── */
-    .confidence-ring {
-        width: 120px; height: 120px; border-radius: 50%; margin: 0 auto;
-        display: flex; align-items: center; justify-content: center;
-        font-size: 1.8rem; font-weight: 700; color: #e6edf3 !important;
-        position: relative;
-    }
-
-    /* ── Critical Alert ── */
+    /* ── Critical Alerts ── */
     .critical-alert {
-        background: linear-gradient(135deg, rgba(248, 81, 73, 0.15), rgba(248, 81, 73, 0.05));
-        border: 2px solid #f85149;
-        border-radius: 12px; padding: 1rem; margin: 0.5rem 0;
-        animation: critical-flash 2s ease-in-out infinite;
-    }
-    @keyframes critical-flash {
-        0%, 100% { border-color: #f85149; }
-        50% { border-color: #da3633; box-shadow: 0 0 20px rgba(248, 81, 73, 0.3); }
+        background: #fef2f2; border: 2px solid #ef4444; border-radius: 12px; padding: 1rem; margin: 0.5rem 0;
     }
 
-    /* ── Download Button ── */
-    .stDownloadButton > button {
-        background: linear-gradient(135deg, #238636, #3fb950) !important;
-        color: white !important; border: none !important;
-        border-radius: 8px !important;
-    }
+    /* ── General UI Wrappers ── */
+    div[data-testid="stExpander"] { background-color: #ffffff !important; border: 1px solid #e2e8f0 !important; border-radius: 12px !important; }
+    div[data-testid="stExpander"] * { color: #334155 !important; }
+    [data-testid="stDataFrame"] { background-color: #ffffff !important; border-radius: 12px; }
+    .stAlert { border-radius: 12px !important; }
 
-    /* ── Code blocks ── */
-    code, pre, .stCodeBlock { color: #e6edf3 !important; }
-
-    /* ── Scrollbar ── */
-    ::-webkit-scrollbar { width: 8px; }
-    ::-webkit-scrollbar-track { background: #0a0e27; }
-    ::-webkit-scrollbar-thumb { background: #30363d; border-radius: 4px; }
-    ::-webkit-scrollbar-thumb:hover { background: #484f58; }
 </style>
 """, unsafe_allow_html=True)
 
@@ -376,6 +234,16 @@ def get_triage_color(level):
 
 def get_card_class(level):
     return f"aria-card aria-card-{level.lower()}"
+
+@st.cache_data
+def load_lottieurl(url: str):
+    try:
+        r = requests.get(url)
+        if r.status_code != 200:
+            return None
+        return r.json()
+    except:
+        return None
 
 
 def get_confidence_color(confidence):
@@ -603,14 +471,22 @@ with st.sidebar:
 # ──────────────────────────────────────────
 # Main Area — Header
 # ──────────────────────────────────────────
+st.markdown("<br>", unsafe_allow_html=True)
+col_spacer1, col_lottie, col_spacer2 = st.columns([1, 2, 1])
+with col_lottie:
+    # A beautiful, clean health/pulse lottie animation
+    lottie_anim = load_lottieurl("https://assets3.lottiefiles.com/packages/lf20_5njp3vgg.json")
+    if lottie_anim:
+        st_lottie(lottie_anim, height=140, key="header_anim")
+
 st.markdown("""
-    <div style="text-align: center; padding: 1rem 0;">
-        <h1 style="font-size: 2.5rem; margin-bottom: 0.2rem;">🏥 ARIA</h1>
-        <p style="color: #8b949e; font-size: 1.1rem; margin-top: 0;">
+    <div style="text-align: center; padding: 0.5rem 0 1.5rem 0;">
+        <h1 style="font-size: 3rem; margin-bottom: 0.2rem; letter-spacing: -1px;">🏥 ARIA</h1>
+        <p style="color: #2563eb; font-weight: 700; letter-spacing: 0.15em; font-size: 1.15rem; margin-top: 0; text-transform: uppercase;">
             Autonomous Real-time Intelligence for Clinical Action
         </p>
-        <p style="color: #484f58; font-size: 0.85rem;">
-            Powered by Google Gemini AI &nbsp;•&nbsp; Multi-Agent Clinical Decision Support
+        <p style="color: #64748b; font-size: 0.95rem; font-weight: 500;">
+            Powered by Google Gemini AI &nbsp;•&nbsp; Premium Clinical Decision Support
         </p>
     </div>
 """, unsafe_allow_html=True)
